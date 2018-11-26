@@ -35,14 +35,10 @@ class SimilarJobsTab extends React.Component {
   }
 
   componentDidMount() {
-    this.getSimilarJobs = this.getSimilarJobs.bind(this);
-    this.showNext = this.showNext.bind(this);
-    this.toggleFilter = this.toggleFilter.bind(this);
-
     this.getSimilarJobs();
   }
 
-  async getSimilarJobs() {
+  getSimilarJobs = async () => {
     const { page, similarJobs, selectedSimilarJob } = this.state;
     const { repoName, selectedJob, notify } = this.props;
     const options = {
@@ -108,13 +104,24 @@ class SimilarJobsTab extends React.Component {
       }
     }
     this.setState({ isLoading: false });
-  }
+  };
 
   // this is triggered by the show previous jobs button
-  showNext() {
+  showNext = () => {
     const { page } = this.state;
     this.setState({ page: page + 1, isLoading: true }, this.getSimilarJobs);
-  }
+  };
+
+  toggleFilter = filterField => {
+    this.setState(
+      {
+        [filterField]: !this.state[filterField],
+        similarJobs: [],
+        isLoading: true,
+      },
+      this.getSimilarJobs,
+    );
+  };
 
   showJobInfo(job) {
     const { repoName, classificationMap } = this.props;
@@ -134,17 +141,6 @@ class SimilarJobsTab extends React.Component {
         this.setState({ selectedSimilarJob: nextJob });
       });
     });
-  }
-
-  toggleFilter(filterField) {
-    this.setState(
-      {
-        [filterField]: !this.state[filterField],
-        similarJobs: [],
-        isLoading: true,
-      },
-      this.getSimilarJobs,
-    );
   }
 
   render() {

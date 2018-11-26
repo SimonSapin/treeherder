@@ -26,13 +26,6 @@ class ActionBar extends React.PureComponent {
   }
 
   componentDidMount() {
-    this.toggleCustomJobActions = this.toggleCustomJobActions.bind(this);
-    this.createGeckoProfile = this.createGeckoProfile.bind(this);
-    this.createInteractiveTask = this.createInteractiveTask.bind(this);
-    this.onOpenLogviewer = this.onOpenLogviewer.bind(this);
-    this.onRetriggerJob = this.onRetriggerJob.bind(this);
-    this.retriggerJob = this.retriggerJob.bind(this);
-
     window.addEventListener(thEvents.openLogviewer, this.onOpenLogviewer);
     window.addEventListener(thEvents.jobRetrigger, this.onRetriggerJob);
   }
@@ -42,12 +35,12 @@ class ActionBar extends React.PureComponent {
     window.removeEventListener(thEvents.jobRetrigger, this.onRetriggerJob);
   }
 
-  onRetriggerJob(event) {
+  onRetriggerJob = event => {
     this.retriggerJob([event.detail.job]);
-  }
+  };
 
   // Open the logviewer and provide notifications if it isn't available
-  onOpenLogviewer() {
+  onOpenLogviewer = () => {
     const { logParseStatus, notify } = this.props;
 
     switch (logParseStatus) {
@@ -63,14 +56,9 @@ class ActionBar extends React.PureComponent {
       case 'parsed':
         $('.logviewer-btn')[0].click();
     }
-  }
+  };
 
-  canCancel() {
-    const { selectedJob } = this.props;
-    return selectedJob.state === 'pending' || selectedJob.state === 'running';
-  }
-
-  createGeckoProfile() {
+  createGeckoProfile = () => {
     const { user, selectedJob, getGeckoDecisionTaskId, notify } = this.props;
     if (!user.isLoggedIn) {
       return notify('Must be logged in to create a gecko profile', 'danger');
@@ -113,9 +101,9 @@ class ActionBar extends React.PureComponent {
         );
       }),
     );
-  }
+  };
 
-  retriggerJob(jobs) {
+  retriggerJob = jobs => {
     const { user, repoName, getGeckoDecisionTaskId, notify } = this.props;
     const jobIds = jobs.map(({ id }) => id);
 
@@ -132,6 +120,64 @@ class ActionBar extends React.PureComponent {
     });
 
     JobModel.retrigger(jobIds, repoName, getGeckoDecisionTaskId, notify);
+  };
+
+  createInteractiveTask = async () => {
+    const {
+      user,
+      selectedJob,
+      repoName,
+      getGeckoDecisionTaskId,
+      notify,
+    } = this.props;
+    const jobId = selectedJob.id;
+
+    if (!user.isLoggedIn) {
+      return notify(
+        'Must be logged in to create an interactive task',
+        'danger',
+      );
+    }
+
+    const job = await JobModel.get(repoName, jobId);
+    const decisionTaskId = await getGeckoDecisionTaskId(job.push_id);
+    const results = await TaskclusterModel.load(decisionTaskId, job);
+    const interactiveTask = results.actions.find(
+      result => result.name === 'create-interactive',
+    );
+
+    try {
+      await TaskclusterModel.submit({
+        action: interactiveTask,
+        decisionTaskId,
+        taskId: results.originalTaskId,
+        input: {
+          notify: user.email,
+        },
+        staticActionVariables: results.staticActionVariables,
+      });
+
+      notify(
+        `Request sent to create an interactive job via actions.json.
+          You will soon receive an email containing a link to interact with the task.`,
+        'success',
+      );
+    } catch (e) {
+      // The full message is too large to fit in a Treeherder
+      // notification box.
+      notify(formatTaskclusterError(e), 'danger', { sticky: true });
+    }
+  };
+
+  toggleCustomJobActions = () => {
+    const { customJobActionsShowing } = this.state;
+
+    this.setState({ customJobActionsShowing: !customJobActionsShowing });
+  };
+
+  canCancel() {
+    const { selectedJob } = this.props;
+    return selectedJob.state === 'pending' || selectedJob.state === 'running';
   }
 
   backfillJob() {
@@ -220,53 +266,6 @@ class ActionBar extends React.PureComponent {
     return title;
   }
 
-  async createInteractiveTask() {
-    const {
-      user,
-      selectedJob,
-      repoName,
-      getGeckoDecisionTaskId,
-      notify,
-    } = this.props;
-    const jobId = selectedJob.id;
-
-    if (!user.isLoggedIn) {
-      return notify(
-        'Must be logged in to create an interactive task',
-        'danger',
-      );
-    }
-
-    const job = await JobModel.get(repoName, jobId);
-    const decisionTaskId = await getGeckoDecisionTaskId(job.push_id);
-    const results = await TaskclusterModel.load(decisionTaskId, job);
-    const interactiveTask = results.actions.find(
-      result => result.name === 'create-interactive',
-    );
-
-    try {
-      await TaskclusterModel.submit({
-        action: interactiveTask,
-        decisionTaskId,
-        taskId: results.originalTaskId,
-        input: {
-          notify: user.email,
-        },
-        staticActionVariables: results.staticActionVariables,
-      });
-
-      notify(
-        `Request sent to create an interactive job via actions.json.
-          You will soon receive an email containing a link to interact with the task.`,
-        'success',
-      );
-    } catch (e) {
-      // The full message is too large to fit in a Treeherder
-      // notification box.
-      notify(formatTaskclusterError(e), 'danger', { sticky: true });
-    }
-  }
-
   cancelJobs(jobs) {
     const { user, repoName, getGeckoDecisionTaskId, notify } = this.props;
     const jobIds = jobs
@@ -282,12 +281,6 @@ class ActionBar extends React.PureComponent {
 
   cancelJob() {
     this.cancelJobs([this.props.selectedJob]);
-  }
-
-  toggleCustomJobActions() {
-    const { customJobActionsShowing } = this.state;
-
-    this.setState({ customJobActionsShowing: !customJobActionsShowing });
   }
 
   render() {

@@ -28,16 +28,6 @@ class PinBoard extends React.Component {
   }
 
   componentDidMount() {
-    this.bugNumberKeyPress = this.bugNumberKeyPress.bind(this);
-    this.save = this.save.bind(this);
-    this.handleRelatedBugDocumentClick = this.handleRelatedBugDocumentClick.bind(
-      this,
-    );
-    this.handleRelatedBugEscape = this.handleRelatedBugEscape.bind(this);
-    this.unPinAll = this.unPinAll.bind(this);
-    this.retriggerAllPinnedJobs = this.retriggerAllPinnedJobs.bind(this);
-    this.pasteSHA = this.pasteSHA.bind(this);
-
     window.addEventListener(thEvents.saveClassification, this.save);
   }
 
@@ -53,7 +43,7 @@ class PinBoard extends React.Component {
     this.setState({ failureClassificationComment: evt.target.value });
   }
 
-  unPinAll() {
+  unPinAll = () => {
     this.props.unPinAll();
     this.setState({
       failureClassificationId: 4,
@@ -61,9 +51,9 @@ class PinBoard extends React.Component {
       enteringBugNumber: false,
       newBugNumber: null,
     });
-  }
+  };
 
-  save() {
+  save = () => {
     const {
       isLoggedIn,
       pinnedJobs,
@@ -110,7 +100,53 @@ class PinBoard extends React.Component {
       // or Firefox on Mac works fine though.
       document.getElementById('keyboard-shortcuts').focus();
     }
-  }
+  };
+
+  // If the pasted data is (or looks like) a 12 or 40 char SHA,
+  // or if the pasted data is an hg.m.o url, automatically select
+  // the 'fixed by commit' classification type
+  pasteSHA = evt => {
+    const pastedData = evt.clipboardData.getData('text');
+
+    if (isSHAorCommit(pastedData)) {
+      this.setState({ failureClassificationId: 2 });
+    }
+  };
+
+  handleRelatedBugDocumentClick = event => {
+    if (!event.target.classList.contains('add-related-bugs-input')) {
+      this.saveEnteredBugNumber();
+      document.removeEventListener('click', this.handleRelatedBugDocumentClick);
+    }
+  };
+
+  handleRelatedBugEscape = event => {
+    if (event.key === 'Escape') {
+      this.toggleEnterBugNumber(false);
+    }
+  };
+
+  bugNumberKeyPress = ev => {
+    if (ev.key === 'Enter') {
+      this.saveEnteredBugNumber(ev.target.value);
+      if (ev.ctrlKey) {
+        // If ctrl+enter, then save the classification
+        this.save();
+      }
+      ev.preventDefault();
+    }
+  };
+
+  retriggerAllPinnedJobs = () => {
+    const { getGeckoDecisionTaskId, notify, repoName } = this.props;
+
+    JobModel.retrigger(
+      Object.keys(this.props.pinnedJobs),
+      repoName,
+      getGeckoDecisionTaskId,
+      notify,
+    );
+  };
 
   createNewClassification() {
     const { email } = this.props;
@@ -179,17 +215,6 @@ class PinBoard extends React.Component {
           notify(formatModelError(response, message), 'danger');
         });
     });
-  }
-
-  // If the pasted data is (or looks like) a 12 or 40 char SHA,
-  // or if the pasted data is an hg.m.o url, automatically select
-  // the 'fixed by commit' classification type
-  pasteSHA(evt) {
-    const pastedData = evt.clipboardData.getData('text');
-
-    if (isSHAorCommit(pastedData)) {
-      this.setState({ failureClassificationId: 2 });
-    }
   }
 
   cancelAllPinnedJobsTitle() {
@@ -300,19 +325,6 @@ class PinBoard extends React.Component {
     return !!Object.keys(this.props.pinnedJobBugs).length;
   }
 
-  handleRelatedBugDocumentClick(event) {
-    if (!event.target.classList.contains('add-related-bugs-input')) {
-      this.saveEnteredBugNumber();
-      document.removeEventListener('click', this.handleRelatedBugDocumentClick);
-    }
-  }
-
-  handleRelatedBugEscape(event) {
-    if (event.key === 'Escape') {
-      this.toggleEnterBugNumber(false);
-    }
-  }
-
   toggleEnterBugNumber(tf) {
     this.setState(
       {
@@ -358,28 +370,6 @@ class PinBoard extends React.Component {
         return true;
       }
     }
-  }
-
-  bugNumberKeyPress(ev) {
-    if (ev.key === 'Enter') {
-      this.saveEnteredBugNumber(ev.target.value);
-      if (ev.ctrlKey) {
-        // If ctrl+enter, then save the classification
-        this.save();
-      }
-      ev.preventDefault();
-    }
-  }
-
-  retriggerAllPinnedJobs() {
-    const { getGeckoDecisionTaskId, notify, repoName } = this.props;
-
-    JobModel.retrigger(
-      Object.keys(this.props.pinnedJobs),
-      repoName,
-      getGeckoDecisionTaskId,
-      notify,
-    );
   }
 
   render() {
